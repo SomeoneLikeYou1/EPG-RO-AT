@@ -1,1 +1,42 @@
+name: Actualizare Automata EPG Combinat
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Rulează automat în fiecare noapte la 04:00 AM (ora RO)
+  workflow_dispatch: # Îți permite să pornești actualizarea și manual
+
+jobs:
+  update-epg:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Accesare fisiere din proiect
+      uses: actions/checkout@v4
+
+    - name: Descarcare, dezarhivare si unire EPG
+      run: |
+        # 1. Descărcare liste comprimate
+        curl -L -o AT1.xml.gz https://epgshare01.online
+        curl -L -o RO1.xml.gz https://epgshare01.online
+
+        # 2. Dezarhivare
+        gunzip -f AT1.xml.gz
+        gunzip -f RO1.xml.gz
+
+        # 3. Unirea celor două liste într-un singur fișier XML curat
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > epg_combinat.xml
+        echo '<tv generator-info-name="GitHub EPG Merger">' >> epg_combinat.xml
+        
+        # Extrage canalele și programele, eliminând capetele de fișier care ar strica formatul
+        sed -e '1,/<tv/d' -e '/<\/tv>/d' AT1.xml >> epg_combinat.xml
+        sed -e '1,/<tv/d' -e '/<\/tv>/d' RO1.xml >> epg_combinat.xml
+        
+        echo '</tv>' >> epg_combinat.xml
+
+    - name: Salvare modificari pe GitHub
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add epg_combinat.xml
+        git commit -m "Actualizat epg_combinat.xml" || exit 0
+        git push
 
